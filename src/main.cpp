@@ -1,104 +1,111 @@
-#include "TopologicalOperation.h"
-#include "string"
+#include "main.hpp"
+
+#include <iostream>
+#include <algorithm>
+#include "controller.hpp"
+#include "shader.hpp"
 
 using namespace std;
-
-void traverseLoop(Loop *_loop, string _loop_name)
+using namespace glm;
+void InitGLFW()
 {
-    cout << "-------\t" << _loop_name << "\t--------" << endl;
-    HalfEdge *he = _loop->lHalfEdge;
-    Vertex *startV = he->startV;
-    do
-    {
-        cout << *(he->startV->point) << endl;
-        he = he->nextHe;
-    } while (nullptr != he && he->startV != startV);
+    // Set window hint
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
+
+    // Create window
+    window = glfwCreateWindow(SCREEN_SIZE.x, SCREEN_SIZE.y, "Face", nullptr, nullptr); // Windowed
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
+    // Options
+    // Initialize GLEW to setup the OpenGL Function pointers
+    glewExperimental = GL_TRUE;
+    glewInit();
+    // Define the viewport dimensions
+    glEnable(GL_MULTISAMPLE);
+    glfwSwapInterval(1);
+
+    // Print out some info about the graphics drivers
+    std::cout << "--------------------------------------" << endl;
+    std::cout << "OpenGL version: " << glGetString(GL_VERSION) << std::endl;
+    std::cout << "GLSL version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
+    std::cout << "Vendor: " << glGetString(GL_VENDOR) << std::endl;
+    std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
 }
 
-int main(int argc, char const *argv[])
+void InitController()
 {
-    // 0
-    Solid *newSolid;
-    Vertex *topUpperLeft;
-    newSolid = mvfs(Point(0.0, 1.0, 0.0), topUpperLeft);
-    Loop *topLoop = newSolid->sFace->fLoop;
+    if (!Controller::Initialize())
+    {
+        std::cout << "Unable to initialize camera!" << endl;
+    }
 
-    HalfEdge *topUpperHalfEdge = mev(topUpperLeft, Point(2.0, 1.0, 0.0), topLoop);
-    Vertex *topUpperRight = topUpperHalfEdge->endV;
+    glfwSetKeyCallback(window, Controller::KeyCallback);
+    glfwSetCursorPosCallback(window, Controller::MouseCallback);
+    glfwSetMouseButtonCallback(window, Controller::MouseButtonCallback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+}
 
-    HalfEdge *topLeftHalfEdge = mev(topUpperLeft, Point(0.0, 1.0, -2.0), topLoop);
-    Vertex *topBottomLeft = topLeftHalfEdge->endV;
+void ReleaseController()
+{
+    Controller::Release();
+}
 
-    HalfEdge *topRightHalfEdge = mev(topUpperRight, Point(2.0, 1.0, -2.0), topLoop);
-    Vertex *topBottomRight = topRightHalfEdge->endV;
-    // Make top ring
-    Loop *downLoop = mef(topBottomLeft, topBottomRight, topLoop);
+int main()
+{
+    // Init GLFW
+    InitGLFW();
+    InitController();
+    // Enable settings
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
 
-    HalfEdge *upperLeftHalfEdge = mev(topUpperLeft, Point(0.0, 0.0, 0.0), downLoop);
-    Vertex *downUpperLeft = upperLeftHalfEdge->endV;
-    HalfEdge *upperRightHalfEdge = mev(topUpperRight, Point(2.0, 0.0, 0.0), downLoop);
-    Vertex *downUpperRight = upperRightHalfEdge->endV;
-    HalfEdge *bottomLeftHalfEdge = mev(topBottomLeft, Point(0.0, 0.0, -2.0), downLoop);
-    Vertex *downBottomLeft = bottomLeftHalfEdge->endV;
-    HalfEdge *bottomRightHalfEdge = mev(topBottomRight, Point(2.0, 0.0, -2.0), downLoop);
-    Vertex *downBottomRight = bottomRightHalfEdge->endV;
+    // Init Model Shader
+    Shader modelShader;
+    modelShader.Initialize("shaders/model.vert.glsl", "shaders/model.frag.glsl");
+    modelShader.Use();
 
-    Loop *upperLoop = mef(downUpperLeft, downUpperRight, downLoop);
-    Loop *rightLoop = mef(downUpperRight, downBottomRight, downLoop);
-    Loop *bottomLoop = mef(downBottomRight, downBottomLeft, downLoop);
-    Loop *leftLoop = mef(downBottomLeft, downUpperLeft, downLoop);
+    mat4 projection = perspective(DEFAULT_ZOOM, float(SCREEN_SIZE.x) / float(SCREEN_SIZE.y), NEAR_PLANE, FAR_PLANE);
+    // Init FPS Var
+    std::cout << "--------------------------------------" << endl;
+    std::cout << "Initialize Done." << endl;
+    GLfloat deltaTime = 0, currentTime = 0;
+    GLfloat startTime = glfwGetTime();
+    GLfloat lastTime = glfwGetTime();
 
-    // Debug
-    traverseLoop(topLoop, "Top Loop");
-    traverseLoop(downLoop, "Down Loop");
+    while (!glfwWindowShouldClose(window))
+    {
+        currentTime = glfwGetTime();
+        deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
 
-    traverseLoop(upperLoop, "Upper Loop");
-    traverseLoop(rightLoop, "Right Loop");
-    traverseLoop(leftLoop, "Left Loop");
-    traverseLoop(bottomLoop, "Bottom Loop");
+        // cout << "--------------------------------------" << endl;
+        // cout << "FTPS :" << 1.0 / deltaTime << endl;
+        glfwPollEvents();
+        Controller::Movement(deltaTime);
+        view = Controller::GetViewMatrix();
+        viewPosition = Controller::GetViewPosition();
+        viewDirection = Controller::GetViewDirection();
+        mat4 inversed = glm::inverse(projection * view);
 
-    // Top inner ring
-    HalfEdge *topBridge = mev(topUpperLeft, Point(0.5, 1.0, -0.5), topLoop);
-    Vertex *topInnerUpperLeft = topBridge->endV;
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    HalfEdge *topInnerUpperHalfEdge = mev(topInnerUpperLeft, Point(1.5, 1.0, -0.5), topLoop);
-    Vertex *topInnerUpperRight = topInnerUpperHalfEdge->endV;
-    HalfEdge *topInnerRightHalfEdge = mev(topInnerUpperRight, Point(1.5, 1.0, -1.5), topLoop);
-    Vertex *topInnerBottomRight = topInnerRightHalfEdge->endV;
-    HalfEdge *topInnerLeftHalfEdge = mev(topInnerUpperLeft, Point(0.5, 1.0, -1.5), topLoop);
-    Vertex *topInnerBottomLeft = topInnerLeftHalfEdge->endV;
+        // particles2DShader.Use();
+        // glBindVertexArray(vao2D);
+        // glDrawArrays(GL_POINTS, 0, samples.size());
 
-    Loop *topInnerLoop = mef(topInnerBottomLeft, topInnerBottomRight, topLoop);
-    Loop *downInnerLoop = kemr(topUpperLeft, topInnerUpperLeft, topLoop);
+        glfwSwapBuffers(window);
+    }
 
+    ReleaseController();
 
-    HalfEdge *upperRightInnerHalfEdge = mev(topInnerUpperRight, Point(1.5, 0.0, -0.5), downInnerLoop);
-    Vertex *downInnerUpperRight = upperRightInnerHalfEdge->endV;
-    HalfEdge *bottomLeftInnerHalfEdge = mev(topInnerBottomLeft, Point(0.5, 0.0, -1.5), downInnerLoop);
-    Vertex *downInnerBottomLeft = bottomLeftInnerHalfEdge->endV;
-    HalfEdge *bottomRightInnerHalfEdge = mev(topInnerBottomRight, Point(1.5, 0.0, -1.5), downInnerLoop);
-    Vertex *downInnerBottomRight = bottomRightInnerHalfEdge->endV;
-    HalfEdge *upperLeftInnerHalfEdge = mev(topInnerUpperLeft, Point(0.5, 0.0, -0.5), downInnerLoop);
-    Vertex *downInnerUpperLeft = upperLeftInnerHalfEdge->endV;
-    traverseLoop(downInnerLoop, "Down Inner Loop");
-
-
-    // Loop *upperInnerLoop = mef(downInnerUpperLeft, downInnerUpperRight, downInnerLoop);
-    // Loop *rightInnerLoop = mef(downInnerUpperRight, downInnerBottomRight, downInnerLoop);
-    // Loop *bottomInnerLoop = mef(downInnerBottomRight, downInnerBottomLeft, downInnerLoop);
-    // Loop *leftInnerLoop = mef(downInnerBottomLeft, downInnerUpperLeft, downInnerLoop);
-
-    // // Debug
-    // traverseLoop(topInnerLoop, "Top Inner Loop");
-    // traverseLoop(downInnerLoop, "Down Inner Loop");
-
-    // traverseLoop(upperInnerLoop, "Upper Inner Loop");
-    // traverseLoop(rightInnerLoop, "Right Inner Loop");
-    // traverseLoop(bottomInnerLoop, "Left Inner Loop");
-    // traverseLoop(leftInnerLoop, "Bottom Inner Loop");
-
-    // kfmrh(topLoop, topInnerLoop);
-    // kfmrh(downLoop, downInnerLoop);
-
+    glfwTerminate();
     return 0;
 }
