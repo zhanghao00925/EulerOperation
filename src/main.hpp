@@ -11,10 +11,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "DrawOperation.hpp"
+
 using namespace std;
 #define PI 3.14159265358979323846
 
-const glm::ivec2 SCREEN_SIZE(720, 720);
+const glm::ivec2 SCREEN_SIZE(1280, 640);
 const float FAR_PLANE = 100.0f;
 const float NEAR_PLANE = 1.0f;
 
@@ -23,7 +25,9 @@ glm::vec3 viewPosition;
 glm::vec3 viewDirection;
 
 GLFWwindow *window;
-void InitGLFW();
+int InitGLFW();
 
 void InitController();
 void ReleaseController();
+
+Solid* CreateSolid();

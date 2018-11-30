@@ -1,6 +1,11 @@
 #pragma once
 
 #include <iostream>
+#include <string>
+// GLM
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 using namespace std;
 
@@ -13,29 +18,6 @@ class Vertex;
 class Edge;
 class Point;
 
-class Vector
-{
-public:
-  Vector(double _x = 0.0, double _y = 0.0, double _z = 0.0) : x(_x), y(_y), z(_z) {}
-  double x, y, z;
-  Vector operator+(const Vector &_v)
-  {
-    Vector temp;
-    temp.x = this->x + _v.x;
-    temp.y = this->y + _v.y;
-    temp.z = this->z + _v.z;
-    return temp;
-  }
-
-  Vector operator-(const Vector &_v)
-  {
-    Vector temp;
-    temp.x = this->x - _v.x;
-    temp.y = this->y - _v.y;
-    temp.z = this->z - _v.z;
-    return temp;
-  }
-};
 class Scene
 {
 public:
@@ -58,15 +40,25 @@ public:
   Solid *fSolid;
   Face *prevF, *nextF;
   Loop *fLoop;
+  int size();
 };
 
 class Loop
 {
 public:
-  Loop() : lFace(nullptr), prevL(nullptr), nextL(nullptr), lHalfEdge(nullptr) {}
+  Loop() : lFace(nullptr), prevL(nullptr), nextL(nullptr), lHalfEdge(nullptr), innerLoop(false) {}
   Face *lFace;
   Loop *prevL, *nextL;
   HalfEdge *lHalfEdge;
+  int size();
+  bool innerLoop;
+  bool isInnerLoop() const {
+    return innerLoop;
+  }
+  void SetInnerLoop(bool _state) {
+    innerLoop = _state;
+    return;
+  }
 };
 
 class HalfEdge
@@ -99,31 +91,40 @@ public:
 class Point
 {
 public:
-  Point() : x(0.0), y(0.0), z(0.0) {}
-  Point(double _x, double _y, double _z) : x(_x), y(_y), z(_z) {}
+  Point() : p(0, 0, 0) {
+    color = glm::vec3(rand() % 255 / 255.0f, rand() % 255 / 255.0f, rand() % 255 / 255.0f);
+  }
+  Point(double _x, double _y, double _z) : p(_x, _y, _z) {}
   void SetPoint(double _x, double _y, double _z)
   {
-    x = _x;
-    y = _y;
-    z = _z;
+    p.x = _x;
+    p.y = _y;
+    p.z = _z;
   }
   void SetPoint(Point _point)
   {
-    x = _point.x;
-    y = _point.y;
-    z = _point.z;
+    p.x = _point.p.x;
+    p.y = _point.p.y;
+    p.z = _point.p.z;
   }
   friend inline ostream &operator<<(ostream &os, Point &point)
   {
-    os << "( " << point.x << ", " << point.y << ", " << point.z << " )";
+    os << "( " << point.p.x << ", " << point.p.y << ", " << point.p.z << " )";
     return os;
   }
-  double x, y, z;
+  glm::vec3 p;
+  glm::vec3 color;
 };
 
 Solid *mvfs(Point _point, Vertex *&_vertex);
 HalfEdge *mev(Vertex *_vertex, Point _point, Loop *_loop);
-Loop *mef(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop);
-Loop *kemr(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop);
+Loop *mef(Vertex *_vertex_1, Vertex *_vertex_2, Loop*& _largeLoop);
+Loop *kemr(Vertex *_vertex_1, Vertex *_vertex_2, Loop*& _largeLoop);
 void kfmrh(Loop *_outter_loop, Loop *_inner_loop);
-Solid *sweep(Face *_face, Vector direction, double distance);
+Solid *sweep(Face *_face, glm::vec3 direction, float distance);
+
+void swapLoop(Loop*& _loop_1, Loop*& _loop_2);
+
+void traverseSolid(Solid *_solid, string _solid_name);
+void traverseFace(Face *_face, string _face_name);
+void traverseLoop(Loop *_loop, string _loop_name);

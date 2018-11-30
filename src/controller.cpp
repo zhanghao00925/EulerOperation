@@ -3,32 +3,17 @@
 
 using namespace std;
 
-double Controller::lastX = 720;
-double Controller::lastY = 720;
-bool Controller::firstMouse = true;
+float Controller::yAngle = 0.0;
+float Controller::zAngle = 0.0;
+unsigned int Controller::count = 0;
 bool Controller::keys[1024] = {false};
-Camera *Controller::camera = nullptr;
 
 bool Controller::Initialize()
 {
-    camera = new Camera();
-    if (camera == nullptr)
-    {
-        return false;
-    }
-    else
-    {
-        return true;
-    }
 }
 
 void Controller::Release()
 {
-    if (camera != nullptr)
-    {
-        delete camera;
-        camera = nullptr;
-    }
 }
 
 void Controller::KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mode)
@@ -36,6 +21,9 @@ void Controller::KeyCallback(GLFWwindow *window, int key, int scancode, int acti
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, GL_TRUE);
+    }
+    if (key == GLFW_KEY_N && action == GLFW_PRESS) {
+        count++;
     }
     if (key >= 0 && key < 1024)
     {
@@ -46,52 +34,17 @@ void Controller::KeyCallback(GLFWwindow *window, int key, int scancode, int acti
     }
 }
 
-void Controller::MouseCallback(GLFWwindow *window, double xpos, double ypos)
+void Controller::Movement(float deltaTime)
 {
-    if (firstMouse)
-    {
-        lastX = (GLfloat)xpos;
-        lastY = (GLfloat)ypos;
-        firstMouse = false;
-    }
-
-    GLfloat xOffset = (GLfloat)xpos - lastX;
-    GLfloat yOffset = lastY - (GLfloat)ypos;
-
-    lastX = (GLfloat)xpos;
-    lastY = (GLfloat)ypos;
-
-    camera->ProcessMouseMovement(xOffset, yOffset, true);
-}
-
-void Controller::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
-{
-}
-
-void Controller::Movement(double deltaTime)
-{
+    deltaTime *= 50;
     // Camera controls
     if (keys[GLFW_KEY_W])
-        camera->ProcessKeyboard(CAM_FORWARD, deltaTime);
+        yAngle += 1.0f * deltaTime;
     if (keys[GLFW_KEY_S])
-        camera->ProcessKeyboard(CAM_BACKWARD, deltaTime);
+        yAngle -= 1.0f * deltaTime;
     if (keys[GLFW_KEY_A])
-        camera->ProcessKeyboard(CAM_LEFT, deltaTime);
+        zAngle += 1.0f * deltaTime;
     if (keys[GLFW_KEY_D])
-        camera->ProcessKeyboard(CAM_RIGHT, deltaTime);
-}
+        zAngle -= 1.0f * deltaTime;
 
-glm::mat4 Controller::GetViewMatrix()
-{
-    return camera->GetViewMatrix();
-}
-
-glm::vec3 Controller::GetViewPosition()
-{
-    return camera->GetViewPosition();
-}
-
-glm::vec3 Controller::GetViewDirection()
-{
-    return camera->GetViewDirection();
 }

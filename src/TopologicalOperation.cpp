@@ -1,5 +1,45 @@
 #include "TopologicalOperation.hpp"
 
+int Face::size()
+{
+    if (fLoop == nullptr)
+    {
+        return 0;
+    }
+    else
+    {
+        int count = 0;
+        Loop *startL = fLoop;
+        Loop *l = fLoop;
+        do
+        {
+            count++;
+            l = l->nextL;
+        } while (nullptr != l && l != startL);
+        return count;
+    }
+}
+
+int Loop::size()
+{
+    if (lHalfEdge == nullptr)
+    {
+        return 0;
+    }
+    else
+    {
+        int count = 0;
+        HalfEdge *startHe = lHalfEdge;
+        HalfEdge *he = lHalfEdge;
+        do
+        {
+            count++;
+            he = he->nextHe;
+        } while (nullptr != he && he != startHe);
+        return count;
+    }
+}
+
 Solid *mvfs(Point _point, Vertex *&_vertex)
 {
     // Create empty Solid, face and loop
@@ -92,9 +132,8 @@ HalfEdge *mev(Vertex *_vertex, Point _point, Loop *_loop)
     return newHalfEdge_1;
 }
 
-Loop *mef(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop)
+Loop *mef(Vertex *_vertex_1, Vertex *_vertex_2, Loop *&_largeLoop)
 {
-    Solid *oldSolid = _loop->lFace->fSolid;
 
     // Create new edge
     HalfEdge *newHalfEdge_1 = new HalfEdge();
@@ -115,13 +154,38 @@ Loop *mef(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop)
     newHalfEdge_2->endV = _vertex_1;
 
     HalfEdge *he;
-    for (he = _loop->lHalfEdge; he->startV != _vertex_1; he = he->nextHe)
+    HalfEdge *startHE;
+    int isRepeatLoop;
+
+    startHE = he = _largeLoop->lHalfEdge;
+    isRepeatLoop = 0;
+    for (he = _largeLoop->lHalfEdge; he->startV != _vertex_1; he = he->nextHe)
     {
+        if (he == startHE && isRepeatLoop == 2)
+        {
+            cout << "Error : TopologicalOperation::mef cannot find vertex_1 : " << *(_vertex_1->point) << "." << endl;
+            return nullptr;
+        }
+        if (he == startHE && isRepeatLoop != 2)
+        {
+            isRepeatLoop++;
+        }
     }
     HalfEdge *firstHalfEdge = he;
 
-    for (he = _loop->lHalfEdge; he->startV != _vertex_2; he = he->nextHe)
+    startHE = he = _largeLoop->lHalfEdge;
+    isRepeatLoop = 0;
+    for (he = _largeLoop->lHalfEdge; he->startV != _vertex_2; he = he->nextHe)
     {
+        if (he == startHE && isRepeatLoop == 2)
+        {
+            cout << "Error : TopologicalOperation::mef cannot find vertex_2 : " << *(_vertex_2->point) << "." << endl;
+            return nullptr;
+        }
+        if (he == startHE && isRepeatLoop != 2)
+        {
+            isRepeatLoop++;
+        }
     }
     HalfEdge *secondHalfEdge = he;
 
@@ -134,9 +198,11 @@ Loop *mef(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop)
     secondHalfEdge->prevHe->nextHe = newHalfEdge_2;
     secondHalfEdge->prevHe = newHalfEdge_1;
 
-    _loop->lHalfEdge = newHalfEdge_1;
+    _largeLoop->lHalfEdge = newHalfEdge_1;
     Loop *newLoop = new Loop();
     newLoop->lHalfEdge = newHalfEdge_2;
+
+    Solid *oldSolid = _largeLoop->lFace->fSolid;
 
     Face *newFace = new Face();
     newFace->fLoop = newLoop;
@@ -164,16 +230,19 @@ Loop *mef(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop)
         e->nextE = newEdge;
         newEdge->prevE = e;
     }
-
+    if (newLoop->size() > _largeLoop->size())
+    {
+        swapLoop(newLoop, _largeLoop);
+    }
     return newLoop;
 }
 
-Loop *kemr(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop)
+Loop *kemr(Vertex *_vertex_1, Vertex *_vertex_2, Loop *&_largeLoop)
 {
     Loop *newLoop = new Loop();
 
     HalfEdge *he;
-    for (he = _loop->lHalfEdge; !(_vertex_1 == he->startV && _vertex_2 == he->endV); he = he->nextHe)
+    for (he = _largeLoop->lHalfEdge; !(_vertex_1 == he->startV && _vertex_2 == he->endV); he = he->nextHe)
     {
     }
 
@@ -184,10 +253,10 @@ Loop *kemr(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop)
     he->prevHe->nextHe = he->adjacentHe->nextHe;
     he->adjacentHe->nextHe->prevHe = he->prevHe;
 
-    _loop->lHalfEdge = he->prevHe;
+    _largeLoop->lHalfEdge = he->prevHe;
     newLoop->lHalfEdge = he->nextHe;
 
-    Face *oldFace = _loop->lFace;
+    Face *oldFace = _largeLoop->lFace;
     newLoop->lFace = oldFace;
 
     Loop *lp;
@@ -197,7 +266,7 @@ Loop *kemr(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop)
     lp->nextL = newLoop;
     newLoop->prevL = lp;
 
-    Solid *oldSolid = _loop->lFace->fSolid;
+    Solid *oldSolid = _largeLoop->lFace->fSolid;
     e = oldSolid->edgeList;
     if (e == he->edge)
     {
@@ -213,7 +282,10 @@ Loop *kemr(Vertex *_vertex_1, Vertex *_vertex_2, Loop *_loop)
         e->nextE = he->edge->nextE;
         e->nextE->prevE = e;
     }
-
+    if (newLoop->size() > _largeLoop->size())
+    {
+        swapLoop(newLoop, _largeLoop);
+    }
     return newLoop;
 }
 
@@ -252,6 +324,82 @@ void kfmrh(Loop *_outter_loop, Loop *_inner_loop)
     return;
 }
 
-Solid *sweep(Face *_face, Vector direction, double distance) {
-    
+Solid *sweep(Face *_face, glm::vec3 direction, float distance)
+{
+    Solid *solid = _face->fSolid;
+    Loop *loop;
+    HalfEdge *he;
+    for (loop = _face->fLoop; loop != nullptr; loop = loop->nextL)
+    {
+        he = loop->lHalfEdge;
+        Vertex *startV = he->startV;
+        glm::vec3 newPosition = startV->point->p + distance * direction;
+        Point newPoint(newPosition.x, newPosition.y, newPosition.z);
+
+        HalfEdge *firstConnectHe = mev(startV, newPoint, loop);
+        Vertex *upVertex_1 = firstConnectHe->endV;
+
+        he = he->nextHe;
+        Vertex *v = he->startV;
+        while (v != startV) 
+        {
+            glm::vec3 newPosition = v->point->p + distance * direction;
+            Point newPoint(newPosition.x, newPosition.y, newPosition.z);
+            
+            HalfEdge *connectHe = mev(v, newPoint, loop);
+            Vertex *upVertex_2 = connectHe->endV;
+            mef(upVertex_2, upVertex_1, loop);
+            upVertex_1 = upVertex_2;
+            he = he->nextHe;
+            v = he->startV;
+        }
+        mef(firstConnectHe->endV, upVertex_1, loop);
+    }
+    return solid;
+}
+
+void swapLoop(Loop *&_loop_1, Loop *&_loop_2)
+{
+    Loop *temp = _loop_1;
+    _loop_1 = _loop_2;
+    _loop_2 = temp;
+}
+
+void traverseSolid(Solid *_solid, string _solid_name)
+{
+    cout << "-------\t" << _solid_name << "\t--------" << endl;
+    Face *startF = _solid->sFace;
+    Face *f = _solid->sFace;
+    do
+    {
+        if (f != nullptr)
+            traverseFace(f, "Anonymous Face");
+        f = f->nextF;
+    } while (nullptr != f && f != startF);
+}
+
+void traverseFace(Face *_face, string _face_name)
+{
+    cout << "-------\t" << _face_name << "\t--------" << endl;
+    Loop *startL = _face->fLoop;
+    Loop *l = _face->fLoop;
+    do
+    {
+        if (l != nullptr)
+            traverseLoop(l, "Anonymous Loop");
+        l = l->nextL;
+    } while (nullptr != l && l != startL);
+}
+
+void traverseLoop(Loop *_loop, string _loop_name)
+{
+    cout << "-------\t" << _loop_name << "\t--------" << endl;
+    HalfEdge *startHe = _loop->lHalfEdge;
+    HalfEdge *he = _loop->lHalfEdge;
+    Vertex *startV = he->startV;
+    do
+    {
+        cout << *(he->startV->point) << endl;
+        he = he->nextHe;
+    } while (nullptr != he && he != startHe);
 }
